@@ -2,9 +2,9 @@ package gibberdet
 
 import (
 	"bytes"
+	"io/ioutil"
 	"strings"
 	"testing"
-	"unicode/utf8"
 )
 
 func findPair(m *Model, ab string) float64 {
@@ -12,11 +12,8 @@ func findPair(m *Model, ab string) float64 {
 	if len(runes) != 2 {
 		panic(nil)
 	}
-	ae, be := make([]byte, 4), make([]byte, 4)
-	ae = ae[:utf8.EncodeRune(ae, runes[0])]
-	be = be[:utf8.EncodeRune(be, runes[1])]
-	ai := m.alpha.Find(ae)
-	bi := m.alpha.Find(be)
+	ai := m.alpha.Find(runes[0])
+	bi := m.alpha.Find(runes[1])
 	return m.gram[ai*m.alpha.ln+bi]
 }
 
@@ -37,5 +34,25 @@ func TestModel(t *testing.T) {
 	}
 	if found1 != found2 || found1 != found3 {
 		t.Fatal()
+	}
+}
+
+var BenchScoreResult float64
+
+func BenchmarkGibberScore(b *testing.B) {
+	var m Model
+	bts, err := ioutil.ReadFile("model.gibber")
+	if err != nil {
+		panic(err)
+	}
+
+	if err := m.UnmarshalBinary(bts); err != nil {
+		panic(err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		BenchScoreResult = m.GibberScore("hello world")
 	}
 }

@@ -99,7 +99,7 @@ func (m *Model) Train(rdr io.Reader) error {
 				}
 			}
 
-			alphaIdx := m.alpha.Find(scratch[pos : pos+sz])
+			alphaIdx := m.alpha.Find(r)
 			pos += sz
 			if alphaIdx >= 0 {
 				if !first {
@@ -138,14 +138,12 @@ func (m *Model) GibberScore(s string) float64 {
 	// Return the average transition prob from l through log_prob_mat.
 	var logProb float64
 	var transitionCnt float64
-	var buf = make([]byte, 4)
 
 	var last int
 	var first = true
 
 	for _, r := range s {
-		n := utf8.EncodeRune(buf, r)
-		alphaIdx := m.alpha.Find(buf[:n])
+		alphaIdx := m.alpha.Find(r)
 		if alphaIdx < 0 {
 			if !first {
 				first = true

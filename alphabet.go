@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"io"
-	"unicode/utf8"
 )
 
 const (
@@ -62,29 +61,33 @@ func (al *Alphabet) Size() int {
 	return al.ln
 }
 
-func (al *Alphabet) Find(buf []byte) (pos int) {
+func (al *Alphabet) Find(rn rune) (pos int) {
 	cur := al.root
-	for _, b := range buf {
+	n := 0
+	for rv := rn; rv > 0; rv >>= 8 {
+		b := uint8(rv)
 		if cur.next[b] == nil {
 			break
 		}
 		cur = cur.next[b]
+		n++
 	}
-	if cur == nil || !cur.set || cur.sz != len(buf) {
+	if cur == nil || !cur.set || cur.sz != n {
 		return -1
 	}
 	return cur.pos
 }
 
 func (al *Alphabet) add(rn rune) {
-	n := utf8.EncodeRune(al.enc[:], rn)
-
 	cur := al.root
-	for _, b := range al.enc[:n] {
+	n := 0
+	for rv := rn; rv > 0; rv >>= 8 {
+		b := uint8(rv)
 		if cur.next[b] == nil {
 			cur.next[b] = &alphaNode{}
 		}
 		cur = cur.next[b]
+		n++
 	}
 	if !cur.set {
 		al.runes = append(al.runes, rn)
