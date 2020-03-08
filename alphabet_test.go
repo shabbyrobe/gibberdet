@@ -4,7 +4,7 @@ import "testing"
 
 var BenchIntResult int
 
-var miscChineseAlpha = NewAlphabet([]rune("的一是不了人我在有他这为之大来以个中上们到说国和地也子时道出而要于就下得可你年生自会那后能对着事其里所去行过家十用发天如然作方成者多日都三小军二无同么经法当起与好看学进种将还分此心前面又定见只主没公从"))
+var miscChineseAlpha = NewAlphabet([]rune("天地玄黃宇宙洪荒日月盈昃辰宿列張寒來暑往秋收冬藏閏餘成歲律召調陽雲騰致雨露結爲霜金生麗水玉出崑岡劍號巨闕珠稱夜光果珍李柰菜重芥薑海鹹河淡鱗潛羽翔龍師火帝鳥官人皇始制文字乃服衣裳推位讓國有虞陶唐"))
 
 func BenchmarkAlphabetFindRuneASCIIInterface(b *testing.B) {
 	for i := 0; i < b.N; i++ {
