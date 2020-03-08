@@ -17,23 +17,27 @@ var (
 	ASCIIAlnum = NewAlphabet([]rune(alpha + numeric + wsp))
 )
 
-type Alphabet struct {
+type Alphabet interface {
+	Runes() []rune
+	Len() int
+	FindRune(rn rune) (pos int)
+	FindByte(b byte) (pos int)
+}
+
+type runeAlphabet struct {
 	root  *alphaNode
 	runes []rune
 	ln    int
+	max   rune
 	enc   [4]byte
 }
 
 func NewAlphabet(runes []rune) Alphabet {
-	node := &alphaNode{}
-	al := Alphabet{
-		root:  node,
-		runes: make([]rune, 0, len(runes)),
+	ra := newRuneAlphabet(runes)
+	if ra.max < 128 {
+		return ra.asASCII()
 	}
-	for _, rn := range runes {
-		al.add(rn)
-	}
-	return al
+	return ra
 }
 
 func AlphabetFromReader(rdr io.Reader, scratch []byte) (Alphabet, error) {
@@ -43,25 +47,49 @@ func AlphabetFromReader(rdr io.Reader, scratch []byte) (Alphabet, error) {
 
 	buf := bufio.NewReader(rdr)
 
-	a := NewAlphabet(nil)
+	a := newRuneAlphabet(nil)
 	for {
 		r, _, err := buf.ReadRune()
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return Alphabet{}, err
+			return nil, err
 		}
 		a.add(r)
+	}
+
+	if a.max < 128 {
+		return a.asASCII(), nil
 	}
 
 	return a, nil
 }
 
-func (al *Alphabet) Size() int {
+func newRuneAlphabet(runes []rune) *runeAlphabet {
+	node := &alphaNode{}
+	al := &runeAlphabet{
+		root:  node,
+		runes: make([]rune, 0, len(runes)),
+	}
+	for _, rn := range runes {
+		al.add(rn)
+	}
+	return al
+}
+
+func (al *runeAlphabet) Runes() []rune {
+	return al.runes
+}
+
+func (al *runeAlphabet) Len() int {
 	return al.ln
 }
 
-func (al *Alphabet) Find(rn rune) (pos int) {
+func (al *runeAlphabet) FindByte(b byte) (pos int) {
+	return al.FindRune(rune(b))
+}
+
+func (al *runeAlphabet) FindRune(rn rune) (pos int) {
 	cur := al.root
 	n := 0
 	for rv := rn; rv > 0; rv >>= 8 {
@@ -78,7 +106,7 @@ func (al *Alphabet) Find(rn rune) (pos int) {
 	return cur.pos
 }
 
-func (al *Alphabet) add(rn rune) {
+func (al *runeAlphabet) add(rn rune) {
 	cur := al.root
 	n := 0
 	for rv := rn; rv > 0; rv >>= 8 {
@@ -95,15 +123,60 @@ func (al *Alphabet) add(rn rune) {
 		cur.pos = al.ln
 		cur.sz = n
 		al.ln++
+		if rn > al.max {
+			al.max = rn
+		}
 	}
 }
 
-func (al *Alphabet) MarshalBinary() (data []byte, err error) {
-	return []byte(string(al.runes)), nil
+func (al *runeAlphabet) asASCII() *asciiAlphabet {
+	return newASCIIAlphabet(al.runes)
 }
 
-func (al *Alphabet) UnmarshalBinary(data []byte) (err error) {
-	*al = NewAlphabet(bytes.Runes(data))
+type asciiAlphabet struct {
+	pos   [256]int // 256 instead of 128 to avoid bounds check
+	runes []rune
+}
+
+func newASCIIAlphabet(runes []rune) *asciiAlphabet {
+	al := &asciiAlphabet{
+		runes: runes,
+	}
+	for idx, rn := range runes {
+		if rn > 127 {
+			panic("expected ASCII")
+		}
+		b := byte(rn)
+		al.pos[b] = idx
+	}
+	return al
+}
+
+func (al *asciiAlphabet) Runes() []rune {
+	return al.runes
+}
+
+func (al *asciiAlphabet) Len() int {
+	return len(al.runes)
+}
+
+func (al *asciiAlphabet) FindByte(b byte) (pos int) {
+	return al.pos[b]
+}
+
+func (al *asciiAlphabet) FindRune(rn rune) (pos int) {
+	if rn > 127 {
+		return 0
+	}
+	return al.pos[byte(rn)]
+}
+
+func marshalAlphabet(a Alphabet) (data []byte, err error) {
+	return []byte(string(a.Runes())), nil
+}
+
+func unmarshalAlphabet(data []byte, into *Alphabet) (err error) {
+	*into = NewAlphabet(bytes.Runes(data))
 	return nil
 }
 

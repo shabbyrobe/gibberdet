@@ -8,6 +8,9 @@ The author originally proposed the technique in an answer on SO and it works pre
 so it has quite a few ports:
 http://stackoverflow.com/questions/6297991/is-there-any-way-to-detect-strings-like-putjbtghguhjjjanika/6298040#comment-7360747
 
+This implementation supports alphabets of arbitrary size, with arbitrary runes,
+with a significantly faster path for alphabets that are within the ASCII range.
+
 
 Usage
 -----
@@ -43,10 +46,22 @@ model.GibberScore("hello") >= thresh // hopefully 'true'
 model.GibberScore("aqwxGdRkdF6F0EoVQ") >= thresh // hopefully 'false'
 ```
 
+
+Silly Benchmark Game
+--------------------
+
+Training and testing are unoptimised, but GibberScore should run pretty fast. All
+score calls have 0 allocs. For ASCII-only alphabets, GibberScore is quite a bit faster
+than alphabets with runes >= 128. On my i7-8550U CPU @ 1.80GHz:
+
+    BenchmarkASCII-8   	53777239	        22.2 ns/op	       0 B/op	       0 allocs/op
+    BenchmarkRune-8   	14762448	        82.2 ns/op	       0 B/op	       0 allocs/op
+
+
 How it works
 ------------
 
-_From [rrenaud's](https://github.com/rrenaud/) original README_
+_From [rrenaud's](https://github.com/rrenaud/) original README_:
 
 > The markov chain first 'trains' or 'studies' a few MB of English text,
 > recording how often characters appear next to each other. Eg, given the text

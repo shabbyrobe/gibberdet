@@ -85,7 +85,10 @@ func use(args []string) error {
 		return err
 	}
 
-	fmt.Println(m.GibberScore(args[1]))
+	m.Fast(true)
+	fmt.Println("Slow:", m.GibberScore(args[1]))
+	m.Fast(false)
+	fmt.Println("Fast:", m.GibberScore(args[1]))
 
 	return nil
 }
