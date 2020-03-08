@@ -50,9 +50,9 @@ model.GibberScore("aqwxGdRkdF6F0EoVQ") >= thresh // hopefully 'false'
 Silly Benchmark Game
 --------------------
 
-Training and testing are unoptimised, but GibberScore should run pretty fast. All
+Training and testing are unoptimised, but GibberScore should run pretty quickly. All
 score calls have 0 allocs. For ASCII-only alphabets, GibberScore is quite a bit faster
-than alphabets with runes >= 128. On my i7-8550U CPU @ 1.80GHz:
+with pure ASCII than with alphabets with runes >= 128. On my i7-8550U CPU @ 1.80GHz:
 
     BenchmarkASCII-8   	53777239	        22.2 ns/op	       0 B/op	       0 allocs/op
     BenchmarkRune-8   	14762448	        82.2 ns/op	       0 B/op	       0 allocs/op
