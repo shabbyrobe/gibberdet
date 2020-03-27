@@ -77,10 +77,19 @@ func BenchmarkGibberScoreByteDelegate(b *testing.B) {
 	}
 
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		BenchScoreResult = m.GibberScore("hello world")
-	}
+	b.Run("byte", func(b *testing.B) {
+		input := []byte("hello world")
+		for i := 0; i < b.N; i++ {
+			BenchScoreResult = m.GibberScoreBytes(input)
+		}
+	})
+
+	b.Run("string", func(b *testing.B) {
+		input := "hello world"
+		for i := 0; i < b.N; i++ {
+			BenchScoreResult = m.GibberScore(input)
+		}
+	})
 }
 
 func BenchmarkGibberScoreRuneDelegate(b *testing.B) {

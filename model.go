@@ -10,11 +10,12 @@ import (
 )
 
 type Model struct {
-	alpha         Alphabet
-	ascii         *asciiAlphabet
-	gram          []float64
-	gibberScoreFn func(string) float64
-	fast          bool
+	alpha          Alphabet
+	ascii          *asciiAlphabet
+	gram           []float64
+	gibberStringFn func(string) float64
+	gibberBytesFn  func([]byte) float64
+	fast           bool
 }
 
 func NewModel(alpha Alphabet) *Model {
@@ -39,9 +40,11 @@ func NewModel(alpha Alphabet) *Model {
 func (m *Model) init() {
 	var ok bool
 	if m.ascii, ok = m.alpha.(*asciiAlphabet); ok {
-		m.gibberScoreFn = m.gibberScoreByByte
+		m.gibberStringFn = m.gibberStringScoreByByte
+		m.gibberBytesFn = m.gibberBytesScoreByByte
 	} else {
-		m.gibberScoreFn = m.gibberScoreByRune
+		m.gibberStringFn = m.gibberStringScoreByRune
+		m.gibberBytesFn = m.gibberBytesScoreByRune
 	}
 }
 
@@ -161,10 +164,14 @@ func (m *Model) Train(rdr io.Reader) error {
 }
 
 func (m *Model) GibberScore(s string) float64 {
-	return m.gibberScoreFn(s)
+	return m.gibberStringFn(s)
 }
 
-func (m *Model) gibberScoreByByte(s string) float64 {
+func (m *Model) GibberScoreBytes(s []byte) float64 {
+	return m.gibberBytesFn(s)
+}
+
+func (m *Model) gibberStringScoreByByte(s string) float64 {
 	if len(s) < 2 {
 		return 0
 	}
@@ -222,7 +229,109 @@ done:
 	return math.Exp(logProb / float64(transitionCnt))
 }
 
-func (m *Model) gibberScoreByRune(s string) float64 {
+func (m *Model) gibberBytesScoreByByte(s []byte) float64 {
+	if len(s) < 2 {
+		return 0
+	}
+
+	// Return the average transition prob from l through log_prob_mat.
+	var logProb float64
+	var transitionCnt int
+
+	var alphaA, alphaB int
+	var alphaLen = m.ascii.Len()
+
+	i := 0
+
+first:
+	alphaA = m.ascii.FindByte(s[i])
+	if alphaA >= 0 {
+		goto nextPair
+	} else {
+		goto nextFirst
+	}
+
+pair:
+	alphaB = m.ascii.FindByte(s[i])
+	if alphaB < 0 {
+		goto nextFirst
+	}
+	logProb += m.gram[alphaA*alphaLen+alphaB]
+	transitionCnt++
+	alphaA = alphaB
+
+nextPair:
+	i++
+	if i >= len(s) {
+		goto done
+	}
+	goto pair
+
+nextFirst:
+	i++
+	if i >= len(s) {
+		goto done
+	}
+	goto first
+
+done:
+	if transitionCnt == 0 {
+		return 0
+	}
+
+	// The exponentiation translates from log probs to probs.
+	// return math.Exp(logProb / float64(transitionCnt))
+	if m.fast {
+		return expFast(logProb / float64(transitionCnt))
+	}
+	return math.Exp(logProb / float64(transitionCnt))
+}
+
+func (m *Model) gibberBytesScoreByRune(s []byte) float64 {
+	if len(s) < 2 {
+		return 0
+	}
+
+	// Return the average transition prob from l through log_prob_mat.
+	var logProb float64
+	var transitionCnt float64
+
+	var last int
+	var first = true
+	var alphaLen = m.alpha.Len()
+
+	for i := 0; i < len(s); {
+		r, sz := utf8.DecodeRune(s[i:])
+		i += sz
+
+		alphaIdx := m.alpha.FindRune(r)
+		if alphaIdx < 0 {
+			if !first {
+				first = true
+			}
+			continue
+		}
+		if first {
+			first = false
+		} else {
+			logProb += m.gram[last*alphaLen+alphaIdx]
+			transitionCnt += 1
+		}
+		last = alphaIdx
+	}
+
+	if transitionCnt == 0 {
+		return 0
+	}
+
+	// The exponentiation translates from log probs to probs.
+	if m.fast {
+		return expFast(logProb / float64(transitionCnt))
+	}
+	return math.Exp(logProb / float64(transitionCnt))
+}
+
+func (m *Model) gibberStringScoreByRune(s string) float64 {
 	if len(s) < 2 {
 		return 0
 	}
@@ -246,8 +355,6 @@ func (m *Model) gibberScoreByRune(s string) float64 {
 		if first {
 			first = false
 		} else {
-			// fmt.Printf("<" + string(lastRune) + string(r) + "> ")
-			// fmt.Println(m.gram[last*m.alpha.ln+alphaIdx])
 			logProb += m.gram[last*alphaLen+alphaIdx]
 			transitionCnt += 1
 		}
