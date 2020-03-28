@@ -222,7 +222,6 @@ done:
 	}
 
 	// The exponentiation translates from log probs to probs.
-	// return math.Exp(logProb / float64(transitionCnt))
 	if m.fast {
 		return expFast(logProb / float64(transitionCnt))
 	}
@@ -280,7 +279,6 @@ done:
 	}
 
 	// The exponentiation translates from log probs to probs.
-	// return math.Exp(logProb / float64(transitionCnt))
 	if m.fast {
 		return expFast(logProb / float64(transitionCnt))
 	}
