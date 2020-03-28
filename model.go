@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"math"
 	"unicode/utf8"
 )
@@ -16,25 +15,6 @@ type Model struct {
 	gibberStringFn func(string) float64
 	gibberBytesFn  func([]byte) float64
 	fast           bool
-}
-
-func NewModel(alpha Alphabet) *Model {
-	// Assume we have seen 10 of each character pair.  This acts as a kind of
-	// prior or smoothing factor.  This way, if we see a character transition
-	// live that we've never observed in the past, we won't assume the entire
-	// string has 0 probability.
-	const weight = 10
-
-	m := &Model{
-		fast:  true,
-		alpha: alpha,
-		gram:  make([]float64, alpha.Len()*alpha.Len()),
-	}
-	for i := range m.gram {
-		m.gram[i] = weight
-	}
-	m.init()
-	return m
 }
 
 func (m *Model) init() {
@@ -85,82 +65,6 @@ func (m *Model) Test(goodInput []string, badInput []string) (thresh float64, err
 	}
 
 	return thresh, nil
-}
-
-func (m *Model) Train(rdr io.Reader) error {
-	scratch := make([]byte, 8192)
-
-	var pos int
-	var leftover []byte
-	var first = true
-	var last int
-
-	alphaLen := m.alpha.Len()
-
-	for {
-	read:
-		if len(leftover) > 0 {
-			copy(scratch, leftover)
-			pos = len(leftover)
-		} else {
-			pos = 0
-		}
-
-		n, err := rdr.Read(scratch[pos:])
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return err
-		}
-
-		end := n + pos
-
-		for pos < end {
-			r, sz := utf8.DecodeRune(scratch[pos:])
-			if r == utf8.RuneError {
-				if end-pos <= 4 {
-					pos += sz
-					leftover = scratch[pos:end]
-					goto read
-				} else {
-					pos += sz
-					continue
-				}
-			}
-
-			alphaIdx := m.alpha.FindRune(r)
-			pos += sz
-			if alphaIdx >= 0 {
-				if !first {
-					m.gram[last*alphaLen+alphaIdx]++
-				} else {
-					first = false
-				}
-				last = alphaIdx
-
-			} else if !first {
-				first = true
-			}
-		}
-	}
-
-	// Normalize the counts so that they become log probabilities.
-	// We use log probabilities rather than straight probabilities to avoid
-	// numeric underflow issues with long texts.
-	// This contains a justification:
-	// http://squarecog.wordpress.com/2009/01/10/dealing-with-underflow-in-joint-probability-calculations/
-	end := alphaLen * alphaLen
-	for i := 0; i < end; i += alphaLen {
-		var s float64
-		for j := 0; j < alphaLen; j++ {
-			s += m.gram[i+j]
-		}
-		for j := 0; j < alphaLen; j++ {
-			m.gram[i+j] = math.Log(m.gram[i+j] / s)
-		}
-	}
-
-	return nil
 }
 
 func (m *Model) GibberScore(s string) float64 {

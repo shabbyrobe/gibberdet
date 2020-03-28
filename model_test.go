@@ -2,6 +2,7 @@ package gibberdet
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -23,10 +24,14 @@ func findPair(m *Model, ab string) float64 {
 	return m.gram[ai*m.alpha.Len()+bi]
 }
 
-func TestModelASCII(t *testing.T) {
+func TestModelASCIIFindGram(t *testing.T) {
 	a := NewAlphabet([]rune("abc"))
-	m := NewModel(a)
-	if err := m.Train(strings.NewReader("aabbcc")); err != nil {
+	tr := NewTrainer(a)
+	if err := tr.Add(strings.NewReader("aabbcc")); err != nil {
+		t.Fatal(err)
+	}
+	m, err := tr.Compile()
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -43,10 +48,14 @@ func TestModelASCII(t *testing.T) {
 	}
 }
 
-func TestModelRune(t *testing.T) {
+func TestModelRuneFindGram(t *testing.T) {
 	a := NewAlphabet([]rune("可界河落布意"))
-	m := NewModel(a)
-	if err := m.Train(strings.NewReader("可界河落布意")); err != nil {
+	tr := NewTrainer(a)
+	if err := tr.Add(strings.NewReader("可界河落布意")); err != nil {
+		t.Fatal(err)
+	}
+	m, err := tr.Compile()
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -63,11 +72,53 @@ func TestModelRune(t *testing.T) {
 	}
 }
 
+func TestModelASCIIScore(t *testing.T) {
+	b, _ := ioutil.ReadFile("testdata/oanc.gibber")
+	var m Model
+	if err := m.UnmarshalBinary(b); err != nil {
+		t.Fatal(err)
+	}
+
+	for idx, tc := range []struct {
+		in    string
+		score float64
+	}{
+		{},
+	} {
+		t.Run(fmt.Sprintf("good/%d", idx), func(t *testing.T) {
+			if m.GibberScore(tc.in) < tc.score {
+				t.Fatal()
+			}
+			if m.GibberScore(tc.in) != m.GibberScoreBytes([]byte(tc.in)) {
+				t.Fatal()
+			}
+		})
+	}
+
+	for idx, tc := range []struct {
+		in    string
+		score float64
+	}{
+		{"2c38qnuonuf", 0.004},
+		{"*)J(*&)(J", 0},
+	} {
+		t.Run(fmt.Sprintf("bad/%d", idx), func(t *testing.T) {
+			score := m.GibberScore(tc.in)
+			if score > tc.score {
+				t.Fatal(tc.in, score)
+			}
+			if m.GibberScore(tc.in) != m.GibberScoreBytes([]byte(tc.in)) {
+				t.Fatal()
+			}
+		})
+	}
+}
+
 var BenchScoreResult float64
 
 func BenchmarkGibberScoreByteDelegate(b *testing.B) {
 	var m Model
-	bts, err := ioutil.ReadFile("model.gibber")
+	bts, err := ioutil.ReadFile("testdata/model.gibber")
 	if err != nil {
 		panic(err)
 	}
@@ -94,7 +145,7 @@ func BenchmarkGibberScoreByteDelegate(b *testing.B) {
 
 func BenchmarkGibberScoreRuneDelegate(b *testing.B) {
 	var m Model
-	bts, err := ioutil.ReadFile("model-cn.gibber")
+	bts, err := ioutil.ReadFile("testdata/model-cn.gibber")
 	if err != nil {
 		panic(err)
 	}

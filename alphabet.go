@@ -24,6 +24,13 @@ type Alphabet interface {
 	FindByte(b byte) (pos int)
 }
 
+type alphaNode struct {
+	next [256]*alphaNode
+	set  bool
+	pos  int
+	sz   int
+}
+
 type runeAlphabet struct {
 	root  *alphaNode
 	runes []rune
@@ -142,6 +149,11 @@ func newASCIIAlphabet(runes []rune) *asciiAlphabet {
 	al := &asciiAlphabet{
 		runes: runes,
 	}
+	_ = al.pos[255]
+	for i := 0; i < 256; i++ {
+		al.pos[i] = -1
+	}
+
 	for idx, rn := range runes {
 		if rn > 127 {
 			panic("expected ASCII")
@@ -178,11 +190,4 @@ func marshalAlphabet(a Alphabet) (data []byte, err error) {
 func unmarshalAlphabet(data []byte, into *Alphabet) (err error) {
 	*into = NewAlphabet(bytes.Runes(data))
 	return nil
-}
-
-type alphaNode struct {
-	next [256]*alphaNode
-	set  bool
-	pos  int
-	sz   int
 }
