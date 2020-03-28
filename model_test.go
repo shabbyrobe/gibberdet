@@ -73,7 +73,7 @@ func TestModelRuneFindGram(t *testing.T) {
 }
 
 func TestModelASCIIScore(t *testing.T) {
-	b, _ := ioutil.ReadFile("testdata/oanc.gibber")
+	b, _ := ioutil.ReadFile("testdata/oanc-en.gibber")
 	var m Model
 	if err := m.UnmarshalBinary(b); err != nil {
 		t.Fatal(err)
@@ -118,7 +118,7 @@ var BenchScoreResult float64
 
 func BenchmarkGibberScoreByteDelegate(b *testing.B) {
 	var m Model
-	bts, err := ioutil.ReadFile("testdata/model.gibber")
+	bts, err := ioutil.ReadFile("testdata/gutenberg-en.gibber")
 	if err != nil {
 		panic(err)
 	}
@@ -145,7 +145,7 @@ func BenchmarkGibberScoreByteDelegate(b *testing.B) {
 
 func BenchmarkGibberScoreRuneDelegate(b *testing.B) {
 	var m Model
-	bts, err := ioutil.ReadFile("testdata/model-cn.gibber")
+	bts, err := ioutil.ReadFile("testdata/test-cn.gibber")
 	if err != nil {
 		panic(err)
 	}

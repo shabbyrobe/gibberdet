@@ -23,11 +23,25 @@ alpha := gibberdet.NewAlphabet("abcde")
 alpha, err := gibberdet.AlphabetFromReader(strings.NewReader(entireInput), nil)
 ```
 
-Train the model:
+Train the model. Use _lots_ of data:
 
 ```go
-model := gibberdet.NewModel(alpha)
-err := model.Train(strings.NewReader("lots and lots and lots of stuff"))
+trainer := gibberdet.NewTrainer(alpha)
+err := trainer.Add(strings.NewReader("lots and lots and lots of stuff"))
+err := trainer.Add(strings.NewReader("even more stuff"))
+model, err := trainer.Compile()
+```
+
+Or use one of the existing built models in `testdata/`, at the moment the
+[OANC](http://www.anc.org/data/oanc/download/) one is probably the best one in
+there.
+
+Save/load the model:
+
+```go
+bts, err := model.MarshalBinary()
+var load gibberdet.Model
+err := load.UnmarshalBinary(bts)
 ```
 
 Build the test threshold with some good and bad strings:
