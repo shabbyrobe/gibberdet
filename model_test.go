@@ -83,13 +83,14 @@ func TestModelASCIIScore(t *testing.T) {
 		in    string
 		score float64
 	}{
-		{},
+		{"test", 0.025},
 	} {
 		t.Run(fmt.Sprintf("good/%d", idx), func(t *testing.T) {
-			if m.GibberScore(tc.in) < tc.score {
-				t.Fatal()
+			score := m.GibberScore(tc.in)
+			if score < tc.score {
+				t.Fatal(tc.in, score)
 			}
-			if m.GibberScore(tc.in) != m.GibberScoreBytes([]byte(tc.in)) {
+			if score != m.GibberScoreBytes([]byte(tc.in)) {
 				t.Fatal()
 			}
 		})
@@ -100,14 +101,14 @@ func TestModelASCIIScore(t *testing.T) {
 		score float64
 	}{
 		{"2c38qnuonuf", 0.004},
-		{"*)J(*&)(J", 0},
+		{"*)J(*&)(J", 0.0002},
 	} {
 		t.Run(fmt.Sprintf("bad/%d", idx), func(t *testing.T) {
 			score := m.GibberScore(tc.in)
 			if score > tc.score {
 				t.Fatal(tc.in, score)
 			}
-			if m.GibberScore(tc.in) != m.GibberScoreBytes([]byte(tc.in)) {
+			if score != m.GibberScoreBytes([]byte(tc.in)) {
 				t.Fatal()
 			}
 		})

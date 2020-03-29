@@ -7,6 +7,12 @@ import (
 	"unicode/utf8"
 )
 
+// Assume we have seen 10 of each character pair.  This acts as a kind of
+// prior or smoothing factor.  This way, if we see a character transition
+// live that we've never observed in the past, we won't assume the entire
+// string has 0 probability.
+const pairWeight = 10
+
 type Trainer struct {
 	alpha   Alphabet
 	ascii   *asciiAlphabet
@@ -15,12 +21,6 @@ type Trainer struct {
 }
 
 func NewTrainer(alpha Alphabet) *Trainer {
-	// Assume we have seen 10 of each character pair.  This acts as a kind of
-	// prior or smoothing factor.  This way, if we see a character transition
-	// live that we've never observed in the past, we won't assume the entire
-	// string has 0 probability.
-	const weight = 10
-
 	scratch := make([]byte, 8192)
 
 	t := &Trainer{
@@ -29,7 +29,7 @@ func NewTrainer(alpha Alphabet) *Trainer {
 		scratch: scratch,
 	}
 	for i := range t.gram {
-		t.gram[i] = weight
+		t.gram[i] = pairWeight
 	}
 
 	return t

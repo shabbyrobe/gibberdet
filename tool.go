@@ -4,6 +4,7 @@ package main
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -24,15 +25,17 @@ func main() {
 
 func run() error {
 	if len(os.Args) < 2 {
-		return fmt.Errorf("usage: tool.go (train|test|use|oanc)")
+		return fmt.Errorf("usage: tool.go (train|test|gib|gibfile|oanc)")
 	}
 	switch os.Args[1] {
 	case "train":
 		return train(os.Args[2:])
 	case "test":
 		return test(os.Args[2:])
-	case "use":
-		return use(os.Args[2:])
+	case "gib":
+		return gib(os.Args[2:])
+	case "gibfile":
+		return gibfile(os.Args[2:])
 	case "oanc":
 		return oanc(os.Args[2:])
 	default:
@@ -41,21 +44,31 @@ func run() error {
 }
 
 func train(args []string) error {
-	if len(args) != 2 {
-		return fmt.Errorf("usage: tool.go build <infile> <outfile>")
+	if len(args) != 3 {
+		return fmt.Errorf("usage: tool.go build (asciialnum|asciialpha|<alphafile>) <infile> <outfile>")
 	}
 
-	bts, err := ioutil.ReadFile(args[0])
+	var a gibberdet.Alphabet
+	switch args[0] {
+	case "asciialnum":
+		a = gibberdet.ASCIIAlnum
+	case "asciialpha":
+		a = gibberdet.ASCIIAlpha
+	default:
+		albts, err := ioutil.ReadFile(args[0])
+		if err != nil {
+			return err
+		}
+		a, _ = gibberdet.AlphabetFromReader(bytes.NewReader(albts), nil)
+	}
+
+	f, err := os.Open(args[1])
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 
-	a, err := gibberdet.AlphabetFromReader(bytes.NewReader(bts), nil)
-	if err != nil {
-		return err
-	}
-
-	m, err := gibberdet.Train(a, bytes.NewReader(bts))
+	m, err := gibberdet.Train(a, f)
 	if err != nil {
 		return err
 	}
@@ -65,7 +78,7 @@ func train(args []string) error {
 		return err
 	}
 
-	if err := ioutil.WriteFile(args[1], enc, 0644); err != nil {
+	if err := ioutil.WriteFile(args[2], enc, 0644); err != nil {
 		return err
 	}
 
@@ -73,12 +86,73 @@ func train(args []string) error {
 }
 
 func test(args []string) error {
+	if len(args) != 3 {
+		return fmt.Errorf("usage: tool.go test <model> <goodfile> <badfile>")
+	}
+
+	bts, err := ioutil.ReadFile(args[0])
+	if err != nil {
+		return err
+	}
+
+	var m gibberdet.Model
+	if err := m.UnmarshalBinary(bts); err != nil {
+		return err
+	}
+
+	good, err := readStringList(args[1])
+	if err != nil {
+		return err
+	}
+
+	bad, err := readStringList(args[2])
+	if err != nil {
+		return err
+	}
+
+	thresh, err := m.Test(good, bad)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(thresh)
+
 	return nil
 }
 
-func use(args []string) error {
+func gibfile(args []string) error {
 	if len(args) != 2 {
-		return fmt.Errorf("usage: tool.go use <model> <teststr>")
+		return fmt.Errorf("usage: tool.go gibfile <model> <file>")
+	}
+
+	bts, err := ioutil.ReadFile(args[0])
+	if err != nil {
+		return err
+	}
+
+	strs, err := readStringList(args[1])
+	if err != nil {
+		return err
+	}
+
+	var m gibberdet.Model
+	if err := m.UnmarshalBinary(bts); err != nil {
+		return err
+	}
+
+	buf := bufio.NewWriter(os.Stdout)
+	for _, s := range strs {
+		v := m.GibberScore(s)
+		fmt.Fprintf(buf, "%0.8f\t%s\n", v, s)
+	}
+	buf.Flush()
+
+	return nil
+}
+
+func gib(args []string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("usage: tool.go gib <model> <teststr>")
 	}
 
 	bts, err := ioutil.ReadFile(args[0])
@@ -146,7 +220,8 @@ func oanc(args []string) error {
 	}
 	defer r.Close()
 
-	train := gibberdet.NewTrainer(gibberdet.ASCIIAlnum)
+	// Exclude numbers as a high incidence of numbers is usually indicative of gibberish
+	train := gibberdet.NewTrainer(gibberdet.ASCIIAlpha)
 
 	for _, finf := range r.File {
 		if filepath.Ext(finf.Name) == ".txt" {
@@ -178,4 +253,16 @@ func oanc(args []string) error {
 	}
 
 	return nil
+}
+
+func readStringList(fname string) (out []string, err error) {
+	bts, err := ioutil.ReadFile(fname)
+	if err != nil {
+		return nil, err
+	}
+	scn := bufio.NewScanner(bytes.NewReader(bts))
+	for scn.Scan() {
+		out = append(out, scn.Text())
+	}
+	return out, nil
 }
