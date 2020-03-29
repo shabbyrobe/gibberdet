@@ -163,20 +163,18 @@ done:
 }
 
 func (m *Model) gibberBytesScoreByRune(s []byte) float64 {
-	if utf8.RuneCount(s) < 2 {
-		return 0
-	}
-
 	// Return the average transition prob from l through log_prob_mat.
 	var logProb float64
 
 	var last int
 	var first = true
 	var alphaLen = m.alpha.Len()
+	var c int
 
 	for i := 0; i < len(s); {
 		r, sz := utf8.DecodeRune(s[i:])
 		i += sz
+		c++
 
 		alphaIdx := m.alpha.FindRune(r)
 		if first {
@@ -188,6 +186,9 @@ func (m *Model) gibberBytesScoreByRune(s []byte) float64 {
 		}
 		last = alphaIdx
 	}
+	if c < 2 {
+		return 0
+	}
 
 	// The exponentiation translates from log probs to probs.
 	if m.fast {
@@ -197,18 +198,16 @@ func (m *Model) gibberBytesScoreByRune(s []byte) float64 {
 }
 
 func (m *Model) gibberStringScoreByRune(s string) float64 {
-	if utf8.RuneCountInString(s) < 2 {
-		return 0
-	}
-
 	// Return the average transition prob from l through log_prob_mat.
 	var logProb float64
 
 	var last int
 	var first = true
 	var alphaLen = m.alpha.Len()
+	var i int
+	var r rune
 
-	for _, r := range s {
+	for i, r = range s {
 		alphaIdx := m.alpha.FindRune(r)
 		if alphaIdx < 0 {
 			if !first {
@@ -222,6 +221,9 @@ func (m *Model) gibberStringScoreByRune(s string) float64 {
 			logProb += m.gram[last*alphaLen+alphaIdx]
 		}
 		last = alphaIdx
+	}
+	if i < 2 {
+		return 0
 	}
 
 	// The exponentiation translates from log probs to probs.
