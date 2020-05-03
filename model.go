@@ -2,6 +2,7 @@ package gibberdet
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -231,6 +232,22 @@ func (m *Model) gibberStringScoreByRune(s string) float64 {
 		return expFast(logProb / float64(len(s)-1))
 	}
 	return math.Exp(logProb / float64(len(s)-1))
+}
+
+func (m *Model) MarshalText() (data []byte, err error) {
+	bts, err := m.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+	return []byte(base64.StdEncoding.EncodeToString(bts)), nil
+}
+
+func (m *Model) UnmarshalText(data []byte) (err error) {
+	bts, err := base64.StdEncoding.DecodeString(string(data))
+	if err != nil {
+		return err
+	}
+	return m.UnmarshalBinary(bts)
 }
 
 func (m *Model) MarshalBinary() (data []byte, err error) {

@@ -2,6 +2,7 @@ package gibberdet
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -69,6 +70,18 @@ func TestModelRuneFindGram(t *testing.T) {
 	}
 	if found1 != found2 || found1 != found3 {
 		t.Fatal()
+	}
+}
+
+func TestMarshalJSON(t *testing.T) {
+	b, _ := ioutil.ReadFile("testdata/oanc-en.gibber")
+	var m Model
+	if err := m.UnmarshalBinary(b); err != nil {
+		t.Fatal(err)
+	}
+	_, err := json.Marshal(&m)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

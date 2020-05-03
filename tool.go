@@ -6,6 +6,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"unicode/utf8"
 
 	"github.com/shabbyrobe/gibberdet"
 )
@@ -121,6 +123,15 @@ func test(args []string) error {
 }
 
 func gibfile(args []string) error {
+	var minSize int
+
+	fs := flag.NewFlagSet("", 0)
+	fs.IntVar(&minSize, "minsz", 5, "skip terms shorter than this many runes")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	args = fs.Args()
+
 	if len(args) != 2 {
 		return fmt.Errorf("usage: tool.go gibfile <model> <file>")
 	}
@@ -142,6 +153,9 @@ func gibfile(args []string) error {
 
 	buf := bufio.NewWriter(os.Stdout)
 	for _, s := range strs {
+		if utf8.RuneCountInString(s) < minSize {
+			continue
+		}
 		v := m.GibberScore(s)
 		fmt.Fprintf(buf, "%0.8f\t%s\n", v, s)
 	}
