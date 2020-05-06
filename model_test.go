@@ -97,6 +97,7 @@ func TestModelASCIIScore(t *testing.T) {
 		score float64
 	}{
 		{"test", 0.025},
+		{"it's", 0.0051},
 	} {
 		t.Run(fmt.Sprintf("good/%d", idx), func(t *testing.T) {
 			score := m.GibberScore(tc.in)

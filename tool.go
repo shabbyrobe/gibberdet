@@ -207,12 +207,12 @@ func oanc(args []string) error {
 			return err
 		}
 
-		rs, err := http.Get("")
-		fmt.Printf("downloading corpus %s to %s, %s kb (file is retained)\n", url, tf.Name(), rs.Header["Content-Length"])
+		rs, err := http.Get(url)
 		if err != nil {
 			tf.Close()
 			return err
 		}
+		fmt.Printf("downloading corpus %s to %s, %s kb (file is retained)\n", url, tf.Name(), rs.Header["Content-Length"])
 
 		if _, err := io.Copy(tf, rs.Body); err != nil {
 			tf.Close()
@@ -235,7 +235,7 @@ func oanc(args []string) error {
 	defer r.Close()
 
 	// Exclude numbers as a high incidence of numbers is usually indicative of gibberish
-	train := gibberdet.NewTrainer(gibberdet.ASCIIAlpha)
+	train := gibberdet.NewTrainer(gibberdet.ASCIIAlphaApos)
 
 	for _, finf := range r.File {
 		if filepath.Ext(finf.Name) == ".txt" {
