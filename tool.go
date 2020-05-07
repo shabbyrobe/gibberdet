@@ -179,10 +179,8 @@ func gib(args []string) error {
 		return err
 	}
 
-	m.Fast(true)
-	fmt.Println("Slow:", m.GibberScore(args[1]))
-	m.Fast(false)
-	fmt.Println("Fast:", m.GibberScore(args[1]))
+	fmt.Println("str:", m.GibberScore(args[1]))
+	fmt.Println("bts:", m.GibberScoreBytes([]byte(args[1])))
 
 	return nil
 }
@@ -235,7 +233,7 @@ func oanc(args []string) error {
 	defer r.Close()
 
 	// Exclude numbers as a high incidence of numbers is usually indicative of gibberish
-	train := gibberdet.NewTrainer(gibberdet.ASCIIAlphaApos)
+	train := gibberdet.NewTrainer(gibberdet.ASCIIAlphaApos, gibberdet.TrainerPairWeight(0))
 
 	for _, finf := range r.File {
 		if filepath.Ext(finf.Name) == ".txt" {

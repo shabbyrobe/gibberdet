@@ -7,29 +7,44 @@ import (
 	"unicode/utf8"
 )
 
-// Assume we have seen 10 of each character pair.  This acts as a kind of
-// prior or smoothing factor.  This way, if we see a character transition
+// Assume we have seen 10 of each character pair. This acts as a kind of
+// prior or smoothing factor. This way, if we see a character transition
 // live that we've never observed in the past, we won't assume the entire
 // string has 0 probability.
-const pairWeight = 10
+const DefaultPairWeight = 10
 
 type Trainer struct {
-	alpha   Alphabet
-	ascii   *asciiAlphabet
-	gram    []float64
-	scratch []byte
+	alpha      Alphabet
+	ascii      *asciiAlphabet
+	gram       []float64
+	scratch    []byte
+	pairWeight float64
 }
 
-func NewTrainer(alpha Alphabet) *Trainer {
+type TrainerOption func(t *Trainer)
+
+func TrainerPairWeight(w float64) TrainerOption {
+	return func(t *Trainer) {
+		t.pairWeight = w
+	}
+}
+
+func NewTrainer(alpha Alphabet, opts ...TrainerOption) *Trainer {
 	scratch := make([]byte, 8192)
 
 	t := &Trainer{
-		alpha:   alpha,
-		gram:    make([]float64, alpha.Len()*alpha.Len()),
-		scratch: scratch,
+		alpha:      alpha,
+		gram:       make([]float64, alpha.Len()*alpha.Len()),
+		scratch:    scratch,
+		pairWeight: DefaultPairWeight,
 	}
+
+	for _, o := range opts {
+		o(t)
+	}
+
 	for i := range t.gram {
-		t.gram[i] = pairWeight
+		t.gram[i] = t.pairWeight
 	}
 
 	return t
@@ -99,7 +114,6 @@ func (t *Trainer) Compile() (*Model, error) {
 	copy(gram, t.gram)
 
 	m := &Model{
-		fast:  true,
 		alpha: t.alpha,
 		gram:  gram,
 	}
@@ -121,7 +135,11 @@ func (t *Trainer) Compile() (*Model, error) {
 			gram[i+j] = math.Log(gram[i+j] / s)
 
 			if math.IsNaN(gram[i+j]) {
-				return nil, fmt.Errorf("NaN detected for %q, %q", string(m.alpha.Runes()[i]), string(m.alpha.Runes()[j]))
+				return nil, fmt.Errorf("NaN detected for %q, %q", string(m.alpha.Runes()[i/alphaLen]), string(m.alpha.Runes()[j]))
+			}
+			if math.IsInf(gram[i+j], 0) {
+				gram[i+j] = math.SmallestNonzeroFloat64
+				// return nil, fmt.Errorf("Inf detected for %q, %q", string(m.alpha.Runes()[i/alphaLen]), string(m.alpha.Runes()[j]))
 			}
 		}
 	}
