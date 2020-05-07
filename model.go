@@ -82,14 +82,15 @@ func (m *Model) gibberStringScoreByByte(s string) float64 {
 		return 0
 	}
 
-	var (
-		logProb  float64 // Return the average transition prob from l through log_prob_mat.
-		alphaA   = m.ascii.FindByte(s[0])
-		alphaB   int
-		alphaLen = m.ascii.Len()
-		i        = 1
-	)
+	// Return the average transition prob from l through log_prob_mat.
+	var logProb float64
 
+	var alphaA, alphaB int
+	var alphaLen = m.ascii.Len()
+
+	alphaA = m.ascii.FindByte(s[0])
+
+	i := 1
 pair:
 	alphaB = m.ascii.FindByte(s[i])
 	if alphaA < 0 || alphaB < 0 {
@@ -97,18 +98,7 @@ pair:
 	} else {
 		logProb += m.gram[alphaA*alphaLen+alphaB]
 	}
-
-	i++
-	if i >= len(s) {
-		goto done
-	}
-
-	alphaA = m.ascii.FindByte(s[i])
-	if alphaA < 0 || alphaB < 0 {
-		logProb += m.zeroGram
-	} else {
-		logProb += m.gram[alphaA*alphaLen+alphaB]
-	}
+	alphaA = alphaB
 
 	i++
 	if i >= len(s) {
