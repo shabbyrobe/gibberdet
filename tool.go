@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"unicode/utf8"
 
 	"github.com/shabbyrobe/gibberdet"
@@ -193,9 +194,11 @@ func oanc(args []string) error {
 	}
 
 	var inFile string
-	if len(args) == 2 {
+	if len(args) >= 2 {
 		inFile = args[1]
 	}
+
+	withUnderscores := true
 
 	if inFile == "" {
 		url := "http://www.anc.org/OANC/OANC_GrAF.zip"
@@ -233,7 +236,7 @@ func oanc(args []string) error {
 	defer r.Close()
 
 	// Exclude numbers as a high incidence of numbers is usually indicative of gibberish
-	train := gibberdet.NewTrainer(gibberdet.ASCIIAlphaApos, gibberdet.TrainerPairWeight(0))
+	train := gibberdet.NewTrainer(gibberdet.ASCIIAlphaWordPunct, gibberdet.TrainerPairWeight(0))
 
 	for _, finf := range r.File {
 		if filepath.Ext(finf.Name) == ".txt" {
@@ -242,11 +245,25 @@ func oanc(args []string) error {
 			if err != nil {
 				return err
 			}
-			if err := train.Add(rc); err != nil {
+			bts, err := ioutil.ReadAll(rc)
+			if err != nil {
 				rc.Close()
 				return err
 			}
 			rc.Close()
+
+			if err := train.Add(bytes.NewReader(bts)); err != nil {
+				return err
+			}
+
+			// If you want the model not to penalise words_separated_by_underscores,
+			// this should help:
+			if withUnderscores {
+				bts = spaceReplacePattern.ReplaceAll(bts, []byte("_"))
+				if err := train.Add(bytes.NewReader(bts)); err != nil {
+					return err
+				}
+			}
 		}
 	}
 
@@ -266,6 +283,8 @@ func oanc(args []string) error {
 
 	return nil
 }
+
+var spaceReplacePattern = regexp.MustCompile(`\s+`)
 
 func readStringList(fname string) (out []string, err error) {
 	bts, err := ioutil.ReadFile(fname)
