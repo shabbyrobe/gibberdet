@@ -47,25 +47,53 @@ func run() error {
 }
 
 func train(args []string) error {
-	if len(args) != 3 {
-		return fmt.Errorf("usage: tool.go build (asciialnum|asciialpha|<alphafile>) <infile> <outfile>")
+	var alphaKind = "asciialnum"
+	var alphaFile string
+
+	fs := flag.NewFlagSet("", 0)
+	fs.StringVar(&alphaKind, "alphakind", "asciialnum", ""+
+		"Alphabet to use. Accepts 'asciialpha', 'asciialnum', 'asciifile' or 'runefile'")
+	fs.StringVar(&alphaFile, "alphafile", "", ""+
+		"File containing alphabet")
+	if err := fs.Parse(args); err != nil {
+		return err
 	}
 
+	args = fs.Args()
+	if len(args) != 2 {
+		return fmt.Errorf(
+			"usage: tool.go build -alphakind (asciialnum|asciialpha|asciifile|runefile) " +
+				"-alphafile=<alphafile> <infile> <outfile>")
+	}
+
+	inFile, outFile := args[0], args[1]
+
 	var a gibberdet.Alphabet
-	switch args[0] {
+	switch alphaKind {
 	case "asciialnum":
 		a = gibberdet.ASCIIAlnum
 	case "asciialpha":
 		a = gibberdet.ASCIIAlpha
-	default:
-		albts, err := ioutil.ReadFile(args[0])
+	case "asciifile", "runefile":
+		af, err := os.Open(alphaFile)
 		if err != nil {
 			return err
 		}
-		a, _ = gibberdet.AlphabetFromReader(bytes.NewReader(albts), nil)
+		defer af.Close()
+
+		var rdr io.Reader = af
+		if alphaKind == "asciifile" {
+			rdr = &filterAsciiReader{af}
+		}
+
+		a, err = gibberdet.AlphabetFromReader(rdr, nil)
+		if err != nil {
+			return err
+		}
+		af.Close()
 	}
 
-	f, err := os.Open(args[1])
+	f, err := os.Open(inFile)
 	if err != nil {
 		return err
 	}
@@ -81,7 +109,7 @@ func train(args []string) error {
 		return err
 	}
 
-	if err := ioutil.WriteFile(args[2], enc, 0644); err != nil {
+	if err := ioutil.WriteFile(outFile, enc, 0644); err != nil {
 		return err
 	}
 
@@ -296,4 +324,31 @@ func readStringList(fname string) (out []string, err error) {
 		out = append(out, scn.Text())
 	}
 	return out, nil
+}
+
+type filterAsciiReader struct {
+	rdr io.Reader
+}
+
+func (r *filterAsciiReader) Read(b []byte) (n int, err error) {
+	n, err = r.rdr.Read(b)
+	if n > 0 && err == io.EOF {
+		err = nil
+	}
+	if err != nil {
+		return n, err
+	}
+
+	var on int
+	for i, o := 0, 0; i < n; i++ {
+		if b[i] < 0x20 || b[i] > 0x7e {
+			continue
+		}
+		if i != o {
+			on++
+			b[o] = b[i]
+			o++
+		}
+	}
+	return on, nil
 }
