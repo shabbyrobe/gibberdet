@@ -53,18 +53,21 @@ func TestAlphabetRuneFromReader(t *testing.T) {
 }
 
 func BenchmarkAlphabetFindRuneASCIIInterface(b *testing.B) {
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		BenchIntResult = ASCIIAlpha.FindRune('a')
 	}
 }
 
 func BenchmarkAlphabetFindByteASCIIInterface(b *testing.B) {
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		BenchIntResult = ASCIIAlpha.FindByte('a')
 	}
 }
 
 func BenchmarkAlphabetFindByteASCIIDirect(b *testing.B) {
+	b.ReportAllocs()
 	alpha := newASCIIAlphabet([]rune(alpha))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -73,6 +76,7 @@ func BenchmarkAlphabetFindByteASCIIDirect(b *testing.B) {
 }
 
 func BenchmarkAlphabetFindRuneWide(b *testing.B) {
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		BenchIntResult = miscChineseAlpha.FindRune('道')
 	}

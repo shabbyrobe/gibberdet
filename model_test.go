@@ -127,8 +127,8 @@ func BenchmarkGibberScoreByteDelegate(b *testing.B) {
 		panic(err)
 	}
 
-	b.ReportAllocs()
 	b.Run("byte", func(b *testing.B) {
+		b.ReportAllocs()
 		input := []byte("hello world")
 		for i := 0; i < b.N; i++ {
 			BenchScoreResult = m.GibberScoreBytes(input)
@@ -136,6 +136,7 @@ func BenchmarkGibberScoreByteDelegate(b *testing.B) {
 	})
 
 	b.Run("string", func(b *testing.B) {
+		b.ReportAllocs()
 		input := "hello world"
 		for i := 0; i < b.N; i++ {
 			BenchScoreResult = m.GibberScore(input)
