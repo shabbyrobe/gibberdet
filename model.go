@@ -2,36 +2,31 @@ package gibberdet
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"math"
-	"unicode/utf8"
+	"unsafe"
 )
 
 type Model struct {
 	alpha          Alphabet
 	ascii          *asciiAlphabet
 	gram           []float64
+	zeroGram       float64
 	gibberStringFn func(string) float64
-	gibberBytesFn  func([]byte) float64
-	fast           bool
 }
 
 func (m *Model) init() {
+	const zeroGramWeight = 2
+	m.zeroGram = math.Log(1/(float64(m.alpha.Len()))) * zeroGramWeight
+
 	var ok bool
 	if m.ascii, ok = m.alpha.(*asciiAlphabet); ok {
 		m.gibberStringFn = m.gibberStringScoreByByte
-		m.gibberBytesFn = m.gibberBytesScoreByByte
 	} else {
 		m.gibberStringFn = m.gibberStringScoreByRune
-		m.gibberBytesFn = m.gibberBytesScoreByRune
 	}
-}
-
-func (m *Model) Fast(active bool) (prev bool) {
-	prev = m.fast
-	m.fast = active
-	return prev
 }
 
 func (m *Model) Alphabet() Alphabet {
@@ -44,11 +39,14 @@ func (m *Model) Test(goodInput []string, badInput []string) (thresh float64, err
 	}
 
 	var minGood = math.MaxFloat64
+	var goodMiss int
 	var maxBad float64
 	for _, s := range goodInput {
 		v := m.GibberScore(s)
-		if v < minGood {
+		if v > 0 && v < minGood {
 			minGood = v
+		} else if v <= 0 {
+			goodMiss++
 		}
 	}
 
@@ -57,6 +55,10 @@ func (m *Model) Test(goodInput []string, badInput []string) (thresh float64, err
 		if v > maxBad {
 			maxBad = v
 		}
+	}
+
+	if float64(goodMiss)/float64(len(goodInput)) > 0.2 {
+		return thresh, fmt.Errorf("gibberdet: test failed; too many good items not found in model: %d / %d", goodMiss, len(goodInput))
 	}
 
 	thresh = (minGood + maxBad) / 2
@@ -72,7 +74,7 @@ func (m *Model) GibberScore(s string) float64 {
 }
 
 func (m *Model) GibberScoreBytes(s []byte) float64 {
-	return m.gibberBytesFn(s)
+	return m.gibberStringFn(*(*string)(unsafe.Pointer(&s)))
 }
 
 func (m *Model) gibberStringScoreByByte(s string) float64 {
@@ -82,171 +84,44 @@ func (m *Model) gibberStringScoreByByte(s string) float64 {
 
 	// Return the average transition prob from l through log_prob_mat.
 	var logProb float64
-	var transitionCnt int
 
 	var alphaA, alphaB int
 	var alphaLen = m.ascii.Len()
 
-	i := 0
+	alphaA = m.ascii.FindByte(s[0])
 
-first:
-	alphaA = m.ascii.FindByte(s[i])
-	if alphaA >= 0 {
-		goto nextPair
-	} else {
-		goto nextFirst
-	}
-
+	i := 1
 pair:
 	alphaB = m.ascii.FindByte(s[i])
-	if alphaB < 0 {
-		goto nextFirst
+	if alphaA < 0 || alphaB < 0 {
+		logProb += m.zeroGram
+	} else {
+		logProb += m.gram[alphaA*alphaLen+alphaB]
 	}
-	logProb += m.gram[alphaA*alphaLen+alphaB]
-	transitionCnt++
 	alphaA = alphaB
 
-nextPair:
 	i++
 	if i >= len(s) {
 		goto done
 	}
 	goto pair
 
-nextFirst:
-	i++
-	if i >= len(s) {
-		goto done
-	}
-	goto first
-
 done:
-	if transitionCnt == 0 {
-		return 0
-	}
-
 	// The exponentiation translates from log probs to probs.
-	if m.fast {
-		return expFast(logProb / float64(transitionCnt))
-	}
-	return math.Exp(logProb / float64(transitionCnt))
-}
-
-func (m *Model) gibberBytesScoreByByte(s []byte) float64 {
-	if len(s) < 2 {
-		return 0
-	}
-
-	// Return the average transition prob from l through log_prob_mat.
-	var logProb float64
-	var transitionCnt int
-
-	var alphaA, alphaB int
-	var alphaLen = m.ascii.Len()
-
-	i := 0
-
-first:
-	alphaA = m.ascii.FindByte(s[i])
-	if alphaA >= 0 {
-		goto nextPair
-	} else {
-		goto nextFirst
-	}
-
-pair:
-	alphaB = m.ascii.FindByte(s[i])
-	if alphaB < 0 {
-		goto nextFirst
-	}
-	logProb += m.gram[alphaA*alphaLen+alphaB]
-	transitionCnt++
-	alphaA = alphaB
-
-nextPair:
-	i++
-	if i >= len(s) {
-		goto done
-	}
-	goto pair
-
-nextFirst:
-	i++
-	if i >= len(s) {
-		goto done
-	}
-	goto first
-
-done:
-	if transitionCnt == 0 {
-		return 0
-	}
-
-	// The exponentiation translates from log probs to probs.
-	if m.fast {
-		return expFast(logProb / float64(transitionCnt))
-	}
-	return math.Exp(logProb / float64(transitionCnt))
-}
-
-func (m *Model) gibberBytesScoreByRune(s []byte) float64 {
-	if len(s) < 2 {
-		return 0
-	}
-
-	// Return the average transition prob from l through log_prob_mat.
-	var logProb float64
-	var transitionCnt float64
-
-	var last int
-	var first = true
-	var alphaLen = m.alpha.Len()
-
-	for i := 0; i < len(s); {
-		r, sz := utf8.DecodeRune(s[i:])
-		i += sz
-
-		alphaIdx := m.alpha.FindRune(r)
-		if alphaIdx < 0 {
-			if !first {
-				first = true
-			}
-			continue
-		}
-		if first {
-			first = false
-		} else {
-			logProb += m.gram[last*alphaLen+alphaIdx]
-			transitionCnt += 1
-		}
-		last = alphaIdx
-	}
-
-	if transitionCnt == 0 {
-		return 0
-	}
-
-	// The exponentiation translates from log probs to probs.
-	if m.fast {
-		return expFast(logProb / float64(transitionCnt))
-	}
-	return math.Exp(logProb / float64(transitionCnt))
+	return expFast(logProb / float64(len(s)-1))
 }
 
 func (m *Model) gibberStringScoreByRune(s string) float64 {
-	if len(s) < 2 {
-		return 0
-	}
-
 	// Return the average transition prob from l through log_prob_mat.
 	var logProb float64
-	var transitionCnt float64
 
 	var last int
 	var first = true
 	var alphaLen = m.alpha.Len()
+	var i int
+	var r rune
 
-	for _, r := range s {
+	for i, r = range s {
 		alphaIdx := m.alpha.FindRune(r)
 		if alphaIdx < 0 {
 			if !first {
@@ -258,20 +133,31 @@ func (m *Model) gibberStringScoreByRune(s string) float64 {
 			first = false
 		} else {
 			logProb += m.gram[last*alphaLen+alphaIdx]
-			transitionCnt += 1
 		}
 		last = alphaIdx
 	}
-
-	if transitionCnt == 0 {
+	if i < 2 {
 		return 0
 	}
 
 	// The exponentiation translates from log probs to probs.
-	if m.fast {
-		return expFast(logProb / float64(transitionCnt))
+	return expFast(logProb / float64(len(s)-1))
+}
+
+func (m *Model) MarshalText() (data []byte, err error) {
+	bts, err := m.MarshalBinary()
+	if err != nil {
+		return nil, err
 	}
-	return math.Exp(logProb / float64(transitionCnt))
+	return []byte(base64.StdEncoding.EncodeToString(bts)), nil
+}
+
+func (m *Model) UnmarshalText(data []byte) (err error) {
+	bts, err := base64.StdEncoding.DecodeString(string(data))
+	if err != nil {
+		return err
+	}
+	return m.UnmarshalBinary(bts)
 }
 
 func (m *Model) MarshalBinary() (data []byte, err error) {
@@ -336,7 +222,6 @@ func (m *Model) UnmarshalBinary(data []byte) (err error) {
 	}
 
 	*m = Model{
-		fast:  true,
 		alpha: NewAlphabet(alpha),
 		gram:  grams,
 	}

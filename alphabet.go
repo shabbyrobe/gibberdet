@@ -7,14 +7,18 @@ import (
 )
 
 const (
-	alpha   = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	numeric = "0123456789"
-	wsp     = " "
+	alpha     = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	numeric   = "0123456789"
+	wordpunct = "_-'"
+	apos      = "'"
+	wsp       = " "
 )
 
 var (
-	ASCIIAlpha = NewAlphabet([]rune(alpha + wsp))
-	ASCIIAlnum = NewAlphabet([]rune(alpha + numeric + wsp))
+	ASCIIAlpha          = NewAlphabet([]rune(alpha + wsp))
+	ASCIIAlphaWordPunct = NewAlphabet([]rune(alpha + wordpunct + wsp))
+	ASCIIAlphaApos      = NewAlphabet([]rune(alpha + apos + wsp))
+	ASCIIAlnum          = NewAlphabet([]rune(alpha + numeric + wsp))
 )
 
 type Alphabet interface {
@@ -22,6 +26,14 @@ type Alphabet interface {
 	Len() int
 	FindRune(rn rune) (pos int)
 	FindByte(b byte) (pos int)
+}
+
+func MergeAlphabet(a1, a2 Alphabet) Alphabet {
+	a1r, a2r := a1.Runes(), a2.Runes()
+	r := make([]rune, len(a1r)+len(a2r))
+	p := copy(r, a1r)
+	copy(r[p:], a2r)
+	return NewAlphabet(r)
 }
 
 type alphaNode struct {

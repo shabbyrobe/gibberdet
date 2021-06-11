@@ -2,6 +2,7 @@ package gibberdet
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -72,6 +73,18 @@ func TestModelRuneFindGram(t *testing.T) {
 	}
 }
 
+func TestMarshalJSON(t *testing.T) {
+	b, _ := ioutil.ReadFile("testdata/oanc-en.gibber")
+	var m Model
+	if err := m.UnmarshalBinary(b); err != nil {
+		t.Fatal(err)
+	}
+	_, err := json.Marshal(&m)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestModelASCIIScore(t *testing.T) {
 	b, _ := ioutil.ReadFile("testdata/oanc-en.gibber")
 	var m Model
@@ -83,13 +96,15 @@ func TestModelASCIIScore(t *testing.T) {
 		in    string
 		score float64
 	}{
-		{},
+		{"test", 0.025},
+		{"it's", 0.0051},
 	} {
 		t.Run(fmt.Sprintf("good/%d", idx), func(t *testing.T) {
-			if m.GibberScore(tc.in) < tc.score {
-				t.Fatal()
+			score := m.GibberScore(tc.in)
+			if score < tc.score {
+				t.Fatal(tc.in, score)
 			}
-			if m.GibberScore(tc.in) != m.GibberScoreBytes([]byte(tc.in)) {
+			if score != m.GibberScoreBytes([]byte(tc.in)) {
 				t.Fatal()
 			}
 		})
@@ -99,15 +114,15 @@ func TestModelASCIIScore(t *testing.T) {
 		in    string
 		score float64
 	}{
-		{"2c38qnuonuf", 0.004},
-		{"*)J(*&)(J", 0},
+		{"2c38qnuonuf", 0.003},
+		{"*)J(*&)(J", 0.00035},
 	} {
 		t.Run(fmt.Sprintf("bad/%d", idx), func(t *testing.T) {
 			score := m.GibberScore(tc.in)
 			if score > tc.score {
 				t.Fatal(tc.in, score)
 			}
-			if m.GibberScore(tc.in) != m.GibberScoreBytes([]byte(tc.in)) {
+			if score != m.GibberScoreBytes([]byte(tc.in)) {
 				t.Fatal()
 			}
 		})
